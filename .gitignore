@@ -1,0 +1,32 @@
+.venv/
+
+# Environment configuration
+.env
+.env.*
+!.env.example
+frontend/.env*
+!frontend/.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+*.log
+*.sqlite
+*.sqlite3
+
+# Node and Vite
+node_modules/
+frontend/dist/
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/

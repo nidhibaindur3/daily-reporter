@@ -1,0 +1,31 @@
+from app.db.models.market_intelligence import (
+    ClaimDependencyModel,
+    ClaimModel,
+    DiscoveryRunModel,
+    EvidenceModel,
+    JobModel,
+    ResearchOpportunityModel,
+    ResearchThesisModel,
+    SignalClaimModel,
+    SignalModel,
+    SourceModel,
+    SourceSnapshotModel,
+    ThemeModel,
+    ThemeSignalModel,
+)
+
+__all__ = [
+    "ClaimDependencyModel",
+    "ClaimModel",
+    "DiscoveryRunModel",
+    "EvidenceModel",
+    "JobModel",
+    "ResearchOpportunityModel",
+    "ResearchThesisModel",
+    "SignalClaimModel",
+    "SignalModel",
+    "SourceModel",
+    "SourceSnapshotModel",
+    "ThemeModel",
+    "ThemeSignalModel",
+]
