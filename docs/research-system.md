@@ -54,7 +54,7 @@ remain visibly incomplete when wider or contradictory evidence is needed.
 | Sources | Collect, normalize, hash, deduplicate, and persist snapshots | Deterministic |
 | Claims | Extract atomic statements tied to known snapshots | AI, then deterministic validation |
 | Signals | Form source observations and convergence signals | Deterministic |
-| Themes | Connect signals into a small set of candidate patterns | AI, then deterministic thresholds |
+| Themes | Connect signals into a small set of candidate patterns using explicit source-group context | AI, then deterministic thresholds |
 | Evidence | Verify evidence coverage and source relationships | Deterministic |
 | Contradictions | Challenge the theme within the closed evidence packet | Separate AI call |
 | Thesis | Form cited implications, mechanisms, and research posture | AI, then deterministic validation |
@@ -64,6 +64,16 @@ remain visibly incomplete when wider or contradictory evidence is needed.
 The worker persists each stage. Attempts, leases, retries, and stable error codes
 allow interrupted work to recover without turning the entire worker into one
 autonomous agent.
+
+Provenance writes are idempotent. When two premise paths resolve to the same
+source snapshot for one conclusion, the worker stores one contextual evidence
+record instead of failing or duplicating the citation.
+
+If thesis validation rejects a model response, the thesis stage makes one
+bounded corrective call with the validator's reason codes. The correction must
+regenerate the structured thesis under the same closed evidence packet. A
+second invalid response ends the job instead of repeatedly paying for the same
+unusable output.
 
 ## Pattern threshold
 
@@ -80,6 +90,13 @@ checks:
 If no theme meets the threshold, the correct result is an empty run with a clear
 explanation. The system should not lower the evidence bar merely to fill the
 dashboard.
+
+Theme formation gets source-group identifiers so it can deliberately
+choose independent evidence instead of guessing which signals share a source.
+When the first pass returns no theme despite having multiple independent source
+groups, the worker makes one bounded exploratory retry. The retry may propose a
+plausible, clearly uncertain research hypothesis; deterministic source-breadth
+and provenance checks still decide whether it can be published.
 
 ## Provenance model
 
@@ -103,6 +120,10 @@ An evidence record keeps:
 
 The opportunity document is optimized for display. The provenance endpoint
 returns the normalized graph for inspection.
+
+The dashboard presents publisher sources as article links. Typed market
+observations remain part of provenance but are labeled generically as **Market
+data**, so a data provider is not mistaken for an article publisher.
 
 ## Claim types
 
@@ -166,8 +187,10 @@ provenance graph.
 Industry selection is explicitly an inference. An industry name does not need
 to appear verbatim in a source when the model can explain a plausible direct or
 second-order mechanism from cited claims. The UI labels the rationale as an
-inference. Company names remain stricter and must be present in cited claim
-entities.
+inference. Specific industries are preferred. If the model supplies only a
+broad but cited sector, the MVP keeps one broad research lead instead of
+silently publishing an empty industry section. Company names remain stricter
+and must be present in cited claim entities.
 
 ## Long-term investment lens
 

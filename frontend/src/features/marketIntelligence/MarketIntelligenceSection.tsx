@@ -52,6 +52,9 @@ function failureGuidance(message: string): string {
   if (message.includes('model_unavailable')) {
     return 'Check the backend-only model configuration and provider availability, then run discovery again.'
   }
+  if (message === 'thesis_output_invalid') {
+    return 'The thesis contained a claim that could not be traced to its cited evidence, so no report was saved. Run discovery again.'
+  }
   if (message.includes('API request failed')) {
     return 'Check that the backend API is running and reachable from the frontend.'
   }
@@ -67,6 +70,9 @@ function failureTitle(message: string): string {
   }
   if (message.includes('model_unavailable')) {
     return 'The research model is unavailable.'
+  }
+  if (message === 'thesis_output_invalid') {
+    return 'The research thesis could not be verified.'
   }
   if (message.includes('API request failed')) {
     return 'Daily Digest could not reach the backend.'
@@ -88,11 +94,22 @@ function SourceLinks({
   sourceIds: string[]
   sources: Map<string, OpportunitySource>
 }) {
+  const resolvedSources = sourceIds.flatMap((sourceId) => {
+    const source = sources.get(sourceId)
+    return source ? [{ sourceId, source }] : []
+  })
+  const articleSources = resolvedSources.filter(
+    ({ source }) => source.document_type !== 'market_data',
+  )
+  const hasMarketData = resolvedSources.some(
+    ({ source }) => source.document_type === 'market_data',
+  )
+
+  if (articleSources.length === 0 && !hasMarketData) return null
+
   return (
     <span className="research-citations" aria-label="Evidence sources">
-      {sourceIds.map((sourceId) => {
-        const source = sources.get(sourceId)
-        if (!source) return null
+      {articleSources.map(({ sourceId, source }) => {
         return source.url ? (
           <a
             key={sourceId}
@@ -109,6 +126,14 @@ function SourceLinks({
           </span>
         )
       })}
+      {hasMarketData && (
+        <span
+          className="research-citations__market-data"
+          title="Deterministic market observation supplied by the backend"
+        >
+          Market data
+        </span>
+      )}
     </span>
   )
 }
@@ -237,13 +262,20 @@ function OpportunityCard({ opportunity }: { opportunity: ResearchOpportunity }) 
       <div className="research-two-column">
         <details open>
           <summary>Industries to investigate</summary>
-          {document.affected_industries.map((area) => (
-            <div className="affected-area" key={area.name}>
-              <h5>{area.name}</h5>
-              <small>{`${displayLabel(area.relationship)} · ${area.direction}`}</small>
-              <CitedItem item={area.rationale} sources={sources} />
-            </div>
-          ))}
+          {document.affected_industries.length > 0 ? (
+            document.affected_industries.map((area) => (
+              <div className="affected-area" key={area.name}>
+                <h5>{area.name}</h5>
+                <small>{`${displayLabel(area.relationship)} · ${area.direction}`}</small>
+                <CitedItem item={area.rationale} sources={sources} />
+              </div>
+            ))
+          ) : (
+            <p className="research-limitation">
+              This older report did not include an industry suggestion. Run a
+              new discovery to generate one.
+            </p>
+          )}
         </details>
         <details open>
           <summary>Companies to investigate</summary>

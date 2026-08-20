@@ -253,22 +253,49 @@ def test_thesis_contract_requires_at_least_one_industry_inference() -> None:
         ThesisDraft.model_validate(payload)
 
 
-def test_thesis_validation_rejects_vague_industry_label() -> None:
+def test_thesis_validation_allows_cited_broad_industry_as_fallback() -> None:
     output = thesis("A grounded statement.", "claim-1")
     output.affected_industries[0] = AffectedAreaDraft(
-        name="Markets",
+        name="Technology",
         relationship="direct",
         direction="unknown",
         rationale=CitedDraft(
-            text="Markets could be affected.",
+            text="Technology could be affected.",
             claim_ids=["claim-1"],
         ),
+    )
+
+    validate_thesis_draft(output, "theme-1", (source_claim(),))
+
+
+def test_thesis_validation_rejects_missing_industry_after_sanitization() -> None:
+    output = thesis("A grounded statement.", "claim-1").model_copy(
+        update={"affected_industries": []}
     )
 
     with pytest.raises(MarketIntelligenceValidationError) as error:
         validate_thesis_draft(output, "theme-1", (source_claim(),))
 
-    assert "unsupported_industry" in error.value.reason_codes
+    assert "missing_affected_industry" in error.value.reason_codes
+
+
+def test_thesis_sanitization_uses_cited_broad_industry_as_fallback() -> None:
+    output = thesis("A grounded statement.", "claim-1")
+    output.affected_industries = [
+        AffectedAreaDraft(
+            name="Technology",
+            relationship="direct",
+            direction="unknown",
+            rationale=CitedDraft(
+                text="Technology could be affected.",
+                claim_ids=["claim-1"],
+            ),
+        )
+    ]
+
+    sanitized = sanitize_thesis_draft(output, (source_claim(),))
+
+    assert [area.name for area in sanitized.affected_industries] == ["Technology"]
 
 
 def test_thesis_sanitization_keeps_industry_inference_and_removes_company() -> None:

@@ -412,6 +412,12 @@ h2 {
   background: #246b4c;
 }
 
+.research-citations > .research-citations__market-data {
+  color: #5d665f;
+  background: #edf0ed;
+  font-weight: 650;
+}
+
 .research-list {
   display: grid;
   gap: 0.85rem;

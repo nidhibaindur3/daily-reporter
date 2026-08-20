@@ -213,7 +213,10 @@ class MarketIntelligenceRepository:
         dependencies: Iterable[tuple[str, str, str]],
         evidence: Iterable[EvidenceRecord],
     ) -> None:
-        for claim in claims:
+        unique_claims = {claim.id: claim for claim in claims}
+        unique_dependencies = tuple(dict.fromkeys(dependencies))
+        unique_evidence = {item.id: item for item in evidence}
+        for claim in unique_claims.values():
             self._session.merge(
                 ClaimModel(
                     id=claim.id,
@@ -228,7 +231,7 @@ class MarketIntelligenceRepository:
                 )
             )
         self._session.flush()
-        for parent_claim_id, dependent_claim_id, relationship in dependencies:
+        for parent_claim_id, dependent_claim_id, relationship in unique_dependencies:
             self._session.merge(
                 ClaimDependencyModel(
                     parent_claim_id=parent_claim_id,
@@ -236,7 +239,7 @@ class MarketIntelligenceRepository:
                     relationship=relationship,
                 )
             )
-        for item in evidence:
+        for item in unique_evidence.values():
             self._session.merge(self._evidence_model(item))
         self._session.commit()
 

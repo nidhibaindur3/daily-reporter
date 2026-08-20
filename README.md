@@ -1,5 +1,6 @@
 # Daily Digest
 
+![Daily Digest research dashboard](frontend/src/assets/daily_digest.png)
 Daily Digest helps you understand what may be moving markets without
 reading every story yourself. It looks for patterns across current information,
 shows the evidence behind those patterns, and suggests industries, companies,
@@ -14,6 +15,12 @@ I wanted a practical way to follow market-moving developments without turning
 an LLM into a stock picker. The interesting engineering problem is not headline
 summarization; it is finding a pattern across different sources, preserving the
 evidence, and making every conclusion easy to challenge.
+
+![Daily Digest Long Term](frontend/src/assets/daily_digest_long_term.png)
+
+![Daily Digest Investigate](frontend/src/assets/daily_digest_investigate.png)
+
+![Daily Digest Analysis](frontend/src/assets/daily_digest_analysis.png)
 
 ## Stack
 
@@ -32,7 +39,7 @@ The dashboard has two main areas:
 - **Market watchlist** — current price, daily change, previous close, and market
   status for configured companies.
 - **Research Discovery** — an on-demand analysis that connects developments
-  across sources and produces evidence-backed research opportunities.
+  across independent sources and produces cited industry research leads.
 
 A research opportunity explains:
 

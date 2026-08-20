@@ -209,6 +209,8 @@ def validate_thesis_draft(
 
     known_claims = {claim.id: claim for claim in claims}
     reasons: set[str] = set()
+    if not output.affected_industries:
+        reasons.add("missing_affected_industry")
     for cited in cited_drafts(output):
         if not set(cited.claim_ids).issubset(known_claims):
             reasons.add("unknown_claim_id")
@@ -240,12 +242,21 @@ def sanitize_thesis_draft(
 ) -> ThesisDraft:
     """Keep cited industry inferences while removing unsupported company names."""
     known_claims = {claim.id: claim for claim in claims}
-    industries = [
+    supported_industries = [
         area
         for area in output.affected_industries
         if not _unsafe_text_reasons(area.name)
         and _industry_inference_is_supported(area, known_claims)
     ]
+    industries = [
+        area
+        for area in supported_industries
+        if area.name.strip().lower() not in _GENERIC_INDUSTRY_LABELS
+    ]
+    if not industries:
+        # Specific industry labels are preferred, but a broad, cited sector is
+        # still a more useful research lead than silently publishing no result.
+        industries = supported_industries[:1]
     companies = [
         area
         for area in output.affected_companies
@@ -321,8 +332,6 @@ def _industry_inference_is_supported(
     and need not appear verbatim in a source. Its rationale still has to resolve
     to source-grounded premise claims.
     """
-    if area.name.strip().lower() in _GENERIC_INDUSTRY_LABELS:
-        return False
     return any(claim_id in known_claims for claim_id in area.rationale.claim_ids)
 
 

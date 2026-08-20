@@ -34,6 +34,8 @@ Every call uses:
 - A strict Pydantic response schema
 - A closed packet with application-owned identifiers
 - Bounded output tokens and request time
+- Compact stage-specific schemas so the thesis returns a focused research lead
+  instead of exhaustive prose
 - Centralized model settings
 - Provider-side storage disabled
 - No tools in the current MVP
@@ -96,9 +98,10 @@ trading access.
 
 ## Failure behavior
 
-Provider errors and invalid model output use the worker's bounded retry policy.
-Exhausted work ends in an explicit failed or incomplete state. Evidence from
-completed stages remains available for debugging and audit.
+Provider errors use the worker's bounded retry policy. Invalid thesis output
+gets one corrective call with validator feedback; another invalid response ends
+the job. Exhausted work ends in an explicit failed or incomplete state.
+Evidence from completed stages remains available for debugging and audit.
 
 The system should abstain when it cannot meet an evidence threshold. A fluent
 answer is not a successful result if its claims are not grounded.

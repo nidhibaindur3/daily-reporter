@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     openai_verbosity: Literal["low", "medium", "high"] = "low"
     market_intelligence_source_limit: int = Field(default=24, ge=6, le=50)
     market_intelligence_maximum_themes: int = Field(default=3, ge=1, le=5)
-    market_intelligence_max_output_tokens: int = Field(default=4500, ge=1000, le=12000)
+    market_intelligence_max_output_tokens: int = Field(default=3500, ge=1000, le=12000)
     market_intelligence_worker_poll_seconds: float = Field(default=5, ge=0.25, le=60)
     market_intelligence_job_lease_seconds: int = Field(default=600, ge=60, le=3600)
     market_intelligence_job_retry_seconds: int = Field(default=30, ge=1, le=600)

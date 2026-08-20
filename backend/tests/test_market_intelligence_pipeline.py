@@ -7,6 +7,7 @@ from app.ai.market_intelligence_contracts import (
     AffectedAreaDraft,
     CitedDraft,
     ClaimExtraction,
+    ContradictionFinding,
     ContradictionReview,
     ExtractedClaim,
     ImpactStepDraft,
@@ -250,6 +251,74 @@ class CrossTopicModel(GroundedModel):
         )
 
 
+class EmptyThenGroundedModel(GroundedModel):
+    def __init__(self) -> None:
+        self.theme_attempts = 0
+        self.retry_source_groups: set[str] = set()
+
+    def form_themes(self, input_packet: dict[str, object]) -> ThemeFormation:
+        self.theme_attempts += 1
+        signals = input_packet["signals"]
+        assert isinstance(signals, list)
+        if self.theme_attempts == 1:
+            return ThemeFormation(themes=[])
+        assert input_packet["selection_mode"] == "exploratory_retry"
+        self.retry_source_groups = {
+            str(group_id)
+            for signal in signals
+            if isinstance(signal, dict)
+            for group_id in signal["source_group_ids"]
+        }
+        return super().form_themes(input_packet)
+
+
+class NumericThenGroundedModel(GroundedModel):
+    def __init__(self) -> None:
+        self.thesis_attempts = 0
+        self.validation_reason_codes: list[str] = []
+
+    def synthesize_thesis(self, input_packet: dict[str, object]) -> ThesisDraft:
+        self.thesis_attempts += 1
+        draft = super().synthesize_thesis(input_packet)
+        if self.thesis_attempts == 1:
+            return draft.model_copy(
+                update={
+                    "summary": CitedDraft(
+                        text="A 99 percent infrastructure constraint may be emerging.",
+                        claim_ids=draft.summary.claim_ids,
+                    )
+                }
+            )
+        feedback = input_packet["validation_feedback"]
+        assert isinstance(feedback, dict)
+        reason_codes = feedback["reason_codes"]
+        assert isinstance(reason_codes, list)
+        self.validation_reason_codes = [str(code) for code in reason_codes]
+        return draft
+
+
+class ContradictingGroundedModel(GroundedModel):
+    def review_contradictions(
+        self, input_packet: dict[str, object]
+    ) -> ContradictionReview:
+        claims = input_packet["claims"]
+        assert isinstance(claims, list)
+        claim_ids = [
+            str(claim["claim_id"]) for claim in claims if isinstance(claim, dict)
+        ]
+        return ContradictionReview(
+            findings=[
+                ContradictionFinding(
+                    target_claim_id=claim_ids[0],
+                    evidence_claim_id=claim_ids[1],
+                    explanation="The second source may contextualize the first.",
+                )
+            ],
+            limitations=[],
+            research_questions=[],
+        )
+
+
 class InMemoryStore:
     def __init__(self) -> None:
         self.run = DiscoveryRun(
@@ -274,6 +343,7 @@ class InMemoryStore:
         self.themes: dict[str, ThemeRecord] = {}
         self.theses: dict[str, ThesisRecord] = {}
         self.opportunities: dict[str, OpportunityRecord] = {}
+        self.derived_evidence_ids: list[str] = []
 
     def get_run(self, run_id: str) -> Optional[DiscoveryRun]:
         return self.run if self.run.id == run_id else None
@@ -316,9 +386,11 @@ class InMemoryStore:
         self.evidence.update((item.id, item) for item in items)
 
     def add_derived_claims(self, claims, dependencies, evidence) -> None:
+        evidence = tuple(evidence)
         self.claims.update((item.id, item) for item in claims)
         self.dependencies.extend(dependencies)
         self.evidence.update((item.id, item) for item in evidence)
+        self.derived_evidence_ids.extend(item.id for item in evidence)
 
     def list_claims(self, run_id: str) -> tuple[ClaimRecord, ...]:
         return tuple(item for item in self.claims.values() if item.run_id == run_id)
@@ -456,3 +528,60 @@ def test_pipeline_can_connect_independent_signals_from_different_topics() -> Non
     theme = next(iter(store.themes.values()))
     assert len(theme.signal_ids) == 2
     assert store.run.status == "incomplete"
+
+
+def test_pipeline_retries_empty_theme_with_source_group_context() -> None:
+    store = InMemoryStore()
+    model = EmptyThenGroundedModel()
+    pipeline = MarketIntelligencePipeline(
+        store=store,
+        news_service=StaticNewsService(),
+        market_service=StaticMarketService(),
+        model=model,
+        source_limit=24,
+        now=lambda: NOW,
+    )
+
+    pipeline.run(store.run.id)
+
+    assert model.theme_attempts == 2
+    assert len(model.retry_source_groups) >= 2
+    opportunity = next(iter(store.opportunities.values()))
+    assert opportunity.document["affected_industries"]
+
+
+def test_pipeline_corrects_invalid_numeric_thesis_output() -> None:
+    store = InMemoryStore()
+    model = NumericThenGroundedModel()
+    pipeline = MarketIntelligencePipeline(
+        store=store,
+        news_service=StaticNewsService(),
+        market_service=StaticMarketService(),
+        model=model,
+        source_limit=24,
+        now=lambda: NOW,
+    )
+
+    pipeline.run(store.run.id)
+
+    assert model.thesis_attempts == 2
+    assert model.validation_reason_codes == ["unsupported_numeric_value"]
+    opportunity = next(iter(store.opportunities.values()))
+    assert opportunity.document["affected_industries"]
+
+
+def test_pipeline_deduplicates_derived_evidence_by_conclusion_and_source() -> None:
+    store = InMemoryStore()
+    pipeline = MarketIntelligencePipeline(
+        store=store,
+        news_service=StaticNewsService(),
+        market_service=StaticMarketService(),
+        model=ContradictingGroundedModel(),
+        source_limit=24,
+        now=lambda: NOW,
+    )
+
+    pipeline.run(store.run.id)
+
+    assert store.derived_evidence_ids
+    assert len(store.derived_evidence_ids) == len(set(store.derived_evidence_ids))

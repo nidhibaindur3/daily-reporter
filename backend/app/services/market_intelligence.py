@@ -499,14 +499,27 @@ class MarketIntelligencePipeline:
             self._store.advance_run(run.id, "evidence")
             return
         claims = {claim.id: claim for claim in self._store.list_claims(run.id)}
+        claim_views = {
+            view.claim.id: view for view in self._store.list_claim_evidence(run.id)
+        }
         packet = {
             "maximum_themes": run.maximum_themes,
+            "selection_mode": "standard",
             "signals": [
                 {
                     "signal_id": signal.id,
+                    "signal_type": signal.signal_type,
                     "description": signal.description,
                     "topic": signal.topic,
                     "independent_source_count": signal.independent_source_count,
+                    "source_group_ids": sorted(
+                        {
+                            snapshot.source.independence_group
+                            for claim_id in signal.claim_ids
+                            for snapshot in claim_views[claim_id].snapshots
+                        }
+                    ),
+                    "strength_score": signal.strength_score,
                     "claim_ids": list(signal.claim_ids),
                     "claims": [
                         claims[claim_id].statement for claim_id in signal.claim_ids
@@ -516,21 +529,49 @@ class MarketIntelligencePipeline:
             ],
         }
         try:
-            output = self._model.form_themes(packet)
-            raw_theme_count = len(output.themes)
-            output = sanitize_theme_formation(
-                output,
-                signals,
-                run.maximum_themes,
-            )
-            validate_theme_formation(output, signals, run.maximum_themes)
-            output = ThemeFormation(
-                themes=self._themes_with_source_breadth(
-                    output.themes,
-                    signals,
-                    run.id,
+            source_group_ids = {
+                group_id
+                for signal in packet["signals"]
+                if isinstance(signal, dict)
+                for group_id in signal["source_group_ids"]
+            }
+            attempt_packets = [packet]
+            if len(source_group_ids) >= 2:
+                attempt_packets.append(
+                    {
+                        **packet,
+                        "selection_mode": "exploratory_retry",
+                        "retry_guidance": (
+                            "The first pass produced no accepted theme. Select the "
+                            "strongest plausible research hypothesis that spans at "
+                            "least two source_group_ids. Present uncertainty "
+                            "explicitly."
+                        ),
+                    }
                 )
-            )
+
+            output = ThemeFormation(themes=[])
+            raw_theme_count = 0
+            for attempt_number, attempt_packet in enumerate(attempt_packets, start=1):
+                candidate = self._model.form_themes(attempt_packet)
+                raw_theme_count += len(candidate.themes)
+                candidate = sanitize_theme_formation(
+                    candidate,
+                    signals,
+                    run.maximum_themes,
+                )
+                validate_theme_formation(candidate, signals, run.maximum_themes)
+                output = ThemeFormation(
+                    themes=self._themes_with_source_breadth(
+                        candidate.themes,
+                        signals,
+                        run.id,
+                    )
+                )
+                if output.themes:
+                    break
+                if attempt_number < len(attempt_packets):
+                    logger.info("market_intelligence_theme_retry reason=no_theme")
             logger.info(
                 "market_intelligence_themes_validated accepted=%d rejected=%d",
                 len(output.themes),
@@ -686,12 +727,41 @@ class MarketIntelligencePipeline:
             claims = tuple(base_views[claim_id].claim for claim_id in claim_ids)
             packet = self._thesis_packet(theme, signals, base_views, claim_ids)
             try:
-                draft = self._model.synthesize_thesis(packet)
-                raw_area_count = len(draft.affected_industries) + len(
-                    draft.affected_companies
-                )
-                draft = sanitize_thesis_draft(draft, claims)
-                validate_thesis_draft(draft, theme.id, claims)
+                draft: Optional[ThesisDraft] = None
+                raw_area_count = 0
+                for attempt_number in range(1, 3):
+                    candidate = self._model.synthesize_thesis(packet)
+                    raw_area_count = len(candidate.affected_industries) + len(
+                        candidate.affected_companies
+                    )
+                    candidate = sanitize_thesis_draft(candidate, claims)
+                    try:
+                        validate_thesis_draft(candidate, theme.id, claims)
+                    except MarketIntelligenceValidationError as exc:
+                        if attempt_number == 2:
+                            raise
+                        logger.info(
+                            "market_intelligence_thesis_retry reasons=%s",
+                            ",".join(exc.reason_codes),
+                        )
+                        packet = {
+                            **packet,
+                            "validation_feedback": {
+                                "reason_codes": list(exc.reason_codes),
+                                "corrections": [
+                                    "Use only known claim IDs.",
+                                    "Use no numeric digits in generated text.",
+                                    "Keep at least one industry inference with a "
+                                    "rationale citing known premise claims.",
+                                    "Do not write URLs or trading instructions.",
+                                ],
+                            },
+                        }
+                        continue
+                    draft = candidate
+                    break
+                if draft is None:
+                    raise MarketIntelligenceValidationError(("thesis_retry_exhausted",))
                 logger.info(
                     "market_intelligence_thesis_validated affected_areas=%d "
                     "affected_areas_removed=%d",
@@ -709,13 +779,17 @@ class MarketIntelligencePipeline:
                     "market_intelligence_thesis_validation_failed "
                     "reasons=schema_or_parse"
                 )
-                raise MarketIntelligencePipelineError("thesis_output_invalid") from exc
+                raise MarketIntelligencePipelineError(
+                    "thesis_output_invalid", retryable=False
+                ) from exc
             except MarketIntelligenceValidationError as exc:
                 logger.warning(
                     "market_intelligence_thesis_validation_failed reasons=%s",
                     ",".join(exc.reason_codes),
                 )
-                raise MarketIntelligencePipelineError("thesis_output_invalid") from exc
+                raise MarketIntelligencePipelineError(
+                    "thesis_output_invalid", retryable=False
+                ) from exc
 
             derived_claims, dependencies, evidence, conclusion_ids = (
                 self._materialize_conclusions(run.id, theme, draft, base_views)
@@ -1001,7 +1075,7 @@ class MarketIntelligencePipeline:
         now = self._now()
         claims: list[ClaimRecord] = []
         dependencies: list[tuple[str, str, str]] = []
-        evidence: list[EvidenceRecord] = []
+        evidence: dict[str, EvidenceRecord] = {}
         conclusion_ids: dict[str, str] = {}
         for path, claim_type, cited in self._labeled_conclusions(draft):
             claim_id = stable_record_id("claim", run_id, theme.id, path)
@@ -1022,28 +1096,27 @@ class MarketIntelligencePipeline:
             for parent_claim_id in cited.claim_ids:
                 dependencies.append((parent_claim_id, claim_id, "premise"))
                 for parent_evidence in base_views[parent_claim_id].evidence:
-                    evidence.append(
-                        EvidenceRecord(
-                            id=stable_record_id(
-                                "evidence",
-                                claim_id,
-                                parent_evidence.source_snapshot_id,
-                                "contextualizes",
-                            ),
-                            run_id=run_id,
-                            claim_id=claim_id,
-                            source_snapshot_id=parent_evidence.source_snapshot_id,
-                            relationship="contextualizes",
-                            passage=parent_evidence.passage,
-                            location=parent_evidence.location,
-                            extraction_method="derived_provenance",
-                            verification_status="premise_resolved",
-                        )
+                    evidence_id = stable_record_id(
+                        "evidence",
+                        claim_id,
+                        parent_evidence.source_snapshot_id,
+                        "contextualizes",
+                    )
+                    evidence[evidence_id] = EvidenceRecord(
+                        id=evidence_id,
+                        run_id=run_id,
+                        claim_id=claim_id,
+                        source_snapshot_id=parent_evidence.source_snapshot_id,
+                        relationship="contextualizes",
+                        passage=parent_evidence.passage,
+                        location=parent_evidence.location,
+                        extraction_method="derived_provenance",
+                        verification_status="premise_resolved",
                     )
         return (
             tuple(claims),
             tuple(dependencies),
-            tuple(evidence),
+            tuple(evidence.values()),
             conclusion_ids,
         )
 

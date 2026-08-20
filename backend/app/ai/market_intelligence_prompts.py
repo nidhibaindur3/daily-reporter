@@ -1,6 +1,6 @@
 import json
 
-MARKET_INTELLIGENCE_PROMPT_VERSION = "market_intelligence.prompt.v4"
+MARKET_INTELLIGENCE_PROMPT_VERSION = "market_intelligence.prompt.v7"
 
 CLAIM_EXTRACTION_INSTRUCTIONS = """
 Extract atomic, source-bound claims from a closed packet of current source
@@ -30,6 +30,8 @@ summarize individual stories.
 Rules:
 - Use only supplied signal IDs and claims.
 - Return no more than the supplied maximum_themes.
+- Use source_group_ids to distinguish independent source groups. Choose signal
+  combinations that span at least two different source_group_ids.
 - A theme may combine apparently unrelated observations, but application code
   will require independent-source breadth before accepting it.
 - Prefer cross-source convergence signals. A theme must span at least two
@@ -42,7 +44,10 @@ Rules:
 - why_now must describe the recent convergence in the supplied signals.
 - Prefer patterns with plausible durable implications for industries or company
   economics. Do not force an investment angle onto unrelated stories.
-- Return no theme when the signals do not form a meaningful pattern.
+- Return no theme only when the signals do not support even a plausible
+  research hypothesis. When selection_mode is exploratory_retry, return the
+  strongest plausible cross-source pattern and make uncertainty clear instead
+  of requiring the relationship to be proven.
 - Do not recommend buying, selling, shorting, or trading.
 """.strip()
 
@@ -71,7 +76,14 @@ Rules:
 - Every conclusion must cite exact claim IDs from the packet.
 - Do not add facts, prices, numbers, dates, or companies that are absent from
   the packet.
-- Infer between one and five specific industry categories that could plausibly
+- Do not repeat quantitative details in generated narrative fields. Use no
+  numeric digits in generated text, even when a premise claim contains a
+  number. The application displays deterministic market values separately.
+- Keep the report focused. Return no more than three industries, three
+  explicitly named companies, and four impact paths. Use one or two items for
+  each case, risk, invalidation, and watch list. Return only the most useful
+  research questions. Prefer short paragraphs over exhaustive commentary.
+- Infer between one and three specific industry categories that could plausibly
   be affected. Industry names do not need to appear verbatim in the packet, but
   each rationale must cite the supplied claims and explain the economic
   mechanism. Treat the industry selection as an inference, not an observed fact.
@@ -98,6 +110,8 @@ Rules:
   valuation, portfolio fit, and risk tolerance are not supplied yet.
 - Do not recommend buying, selling, shorting, or trading.
 - Do not write URLs.
+- If validation_feedback is present, regenerate the complete thesis and follow
+  every listed correction. Do not defend or repeat the rejected output.
 """.strip()
 
 

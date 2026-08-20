@@ -30,6 +30,7 @@ export type OpportunitySource = {
   publisher: string
   url: string | null
   source_class: 'primary_evidence' | 'reporting' | 'discovery'
+  document_type: string
   authority_tier: string
   published_at: string
 }
@@ -146,6 +147,7 @@ function isSource(value: unknown): value is OpportunitySource {
     (value.source_class === 'primary_evidence' ||
       value.source_class === 'reporting' ||
       value.source_class === 'discovery') &&
+    isString(value.document_type) &&
     isString(value.authority_tier) &&
     isString(value.published_at)
   )

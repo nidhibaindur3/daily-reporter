@@ -153,7 +153,7 @@ class InvestmentLensDraft(MarketIntelligenceContract):
         "insufficient_evidence",
     ]
     posture_rationale: CitedDraft
-    what_to_watch: list[CitedDraft] = Field(min_length=1, max_length=6)
+    what_to_watch: list[CitedDraft] = Field(min_length=1, max_length=3)
 
 
 class ThesisDraft(MarketIntelligenceContract):
@@ -162,14 +162,14 @@ class ThesisDraft(MarketIntelligenceContract):
     why_now: CitedDraft
     thesis_statement: CitedDraft
     mechanism: CitedDraft
-    affected_industries: list[AffectedAreaDraft] = Field(min_length=1, max_length=5)
-    affected_companies: list[AffectedAreaDraft] = Field(max_length=10)
-    impact_paths: list[ImpactStepDraft] = Field(max_length=10)
-    bull_case: list[CitedDraft] = Field(min_length=1, max_length=5)
-    bear_case: list[CitedDraft] = Field(min_length=1, max_length=5)
-    risks: list[CitedDraft] = Field(min_length=1, max_length=6)
-    invalidation_conditions: list[CitedDraft] = Field(min_length=1, max_length=5)
-    research_questions: list[CitedDraft] = Field(min_length=1, max_length=8)
+    affected_industries: list[AffectedAreaDraft] = Field(min_length=1, max_length=3)
+    affected_companies: list[AffectedAreaDraft] = Field(max_length=3)
+    impact_paths: list[ImpactStepDraft] = Field(max_length=4)
+    bull_case: list[CitedDraft] = Field(min_length=1, max_length=2)
+    bear_case: list[CitedDraft] = Field(min_length=1, max_length=2)
+    risks: list[CitedDraft] = Field(min_length=1, max_length=3)
+    invalidation_conditions: list[CitedDraft] = Field(min_length=1, max_length=3)
+    research_questions: list[CitedDraft] = Field(min_length=1, max_length=4)
     investment_lens: InvestmentLensDraft
 
 
