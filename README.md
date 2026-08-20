@@ -50,8 +50,7 @@ A research opportunity explains:
 - What evidence to watch next
 - Confidence, limitations, and links to the underlying sources
 
-Curated publisher feeds are used inside the research pipeline. There is no
-standalone news feed, weather page, or daily brief.
+Curated publisher feeds are used inside the research pipeline.
 
 ## How it works
 
