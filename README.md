@@ -30,6 +30,7 @@ evidence, and making every conclusion easy to challenge.
 | Backend | Python and FastAPI |
 | Data | PostgreSQL, Alembic, and pgvector for a planned RAG milestone |
 | AI | OpenAI structured outputs behind backend interfaces |
+| Deployment | Render Blueprint for the frontend, API, worker, and PostgreSQL |
 | Tooling | Docker Compose, pytest, Ruff, ESLint, and GitHub Actions |
 
 ## What the app does today
@@ -82,6 +83,7 @@ third-party requests stay on the server.
 | PostgreSQL-backed research jobs and provenance | Available |
 | Configurable market watchlist | Available |
 | Research Discovery with structured AI output | Available |
+| Render deployment baseline | Available for personal and prototype use |
 | Broad-market, rates, volatility, and valuation context | Next milestone |
 | SEC filings, investor relations, and wider web research | Planned |
 | Personal knowledge base with RAG | Planned |
@@ -159,6 +161,28 @@ To verify the API and database connection:
 
     curl http://127.0.0.1:8000/api/health
 
+## Deploy to Render
+
+The repository includes a **render.yaml** Blueprint that provisions:
+
+- A static site for the React frontend
+- A FastAPI web service
+- A separate background worker
+- A private-network Render Postgres database
+
+Create a Blueprint in Render from this repository and supply
+**FINNHUB_API_KEY** and **OPENAI_API_KEY** when prompted. Render injects the
+database connection and the generated frontend/API URLs; no hostnames or
+credentials need to be committed.
+
+The default Blueprint uses free plans where Render permits them. The background
+worker requires paid compute, and free Render Postgres expires after 30 days.
+The application also does not yet have authentication, so treat this as a
+personal or prototype deployment and monitor provider usage.
+
+See [Deploying to Render](docs/deployment.md) for the exact setup, verification,
+cost, upgrade, and troubleshooting guidance.
+
 ## Run checks
 
 Backend:
@@ -203,6 +227,8 @@ Read these pages in order if you are new to the project:
 
 Reference pages:
 
+- [Render deployment](docs/deployment.md) — Blueprint topology, configuration,
+  verification, and current operational limits.
 - [RAG design](docs/rag.md) — planned persistent-knowledge retrieval.
 - [Testing and evaluation](docs/evaluation.md) — quality gates and evaluation.
 - [Codex instructions](AGENTS.md) — concise rules for future coding sessions.

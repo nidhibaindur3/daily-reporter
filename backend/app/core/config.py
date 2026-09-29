@@ -2,9 +2,10 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal, Optional
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from sqlalchemy import URL
+from sqlalchemy import URL, make_url
+from sqlalchemy.exc import ArgumentError
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 
@@ -12,9 +13,10 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 class Settings(BaseSettings):
     app_env: Literal["development", "test", "production"] = "development"
     frontend_origin: str = "http://localhost:5173"
-    postgres_user: str
-    postgres_password: SecretStr
-    postgres_db: str
+    database_url: Optional[SecretStr] = None
+    postgres_user: Optional[str] = None
+    postgres_password: Optional[SecretStr] = None
+    postgres_db: Optional[str] = None
     postgres_host: str = "localhost"
     postgres_port: int = 5432
     market_watchlist: str = "AAPL,MSFT,NVDA,GOOGL,AMZN"
@@ -51,8 +53,46 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    @model_validator(mode="after")
+    def validate_database_configuration(self) -> "Settings":
+        if self.database_url is not None:
+            try:
+                url = make_url(self.database_url.get_secret_value())
+            except ArgumentError as exc:
+                raise ValueError("DATABASE_URL must be a valid PostgreSQL URL") from exc
+            if url.drivername not in {
+                "postgres",
+                "postgresql",
+                "postgresql+psycopg",
+            }:
+                raise ValueError("DATABASE_URL must be a PostgreSQL URL")
+            return self
+
+        missing = [
+            name
+            for name, value in (
+                ("POSTGRES_USER", self.postgres_user),
+                ("POSTGRES_PASSWORD", self.postgres_password),
+                ("POSTGRES_DB", self.postgres_db),
+            )
+            if value is None
+        ]
+        if missing:
+            raise ValueError(
+                "database configuration requires DATABASE_URL or " + ", ".join(missing)
+            )
+        return self
+
     @property
-    def database_url(self) -> URL:
+    def sqlalchemy_database_url(self) -> URL:
+        if self.database_url is not None:
+            return make_url(self.database_url.get_secret_value()).set(
+                drivername="postgresql+psycopg"
+            )
+
+        assert self.postgres_user is not None
+        assert self.postgres_password is not None
+        assert self.postgres_db is not None
         return URL.create(
             drivername="postgresql+psycopg",
             username=self.postgres_user,

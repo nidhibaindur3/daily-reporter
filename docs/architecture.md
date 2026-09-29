@@ -18,6 +18,28 @@ This modular monolith keeps local development and operations simple while
 preserving clear boundaries between the UI, application logic, providers, AI,
 and persistence.
 
+## Deployment topology
+
+**Current:** The repository includes a Render Blueprint that maps each runtime
+part to a native Render resource:
+
+| Application part | Render resource |
+| --- | --- |
+| React frontend | Static site |
+| FastAPI API | Web service |
+| Research worker | Background worker |
+| PostgreSQL | Render Postgres 16 |
+
+The API and worker receive Render's internal PostgreSQL connection string. The
+frontend and API receive each other's generated public URL for API requests and
+the exact CORS allowlist. Alembic migrations run as the paid worker's pre-deploy
+command because Render does not support pre-deploy commands on free web
+services.
+
+This preserves the same process and dependency boundaries used locally; Render
+does not introduce another queue, cache, or service. See
+[Deploying to Render](deployment.md) for setup and current limits.
+
 ## Runtime view
 
     Browser

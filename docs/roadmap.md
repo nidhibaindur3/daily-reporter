@@ -1,6 +1,7 @@
 # Development roadmap
 
-**Status:** Milestone 3 is available. Milestone 4 is next.
+**Status:** Milestone 3 and a Render deployment baseline are available.
+Milestone 4 is next.
 
 ## At a glance
 
@@ -14,7 +15,7 @@
 | 6. Deep research | Investigate a user-selected question | Planned |
 | 7. Persistent knowledge | Add saved knowledge and RAG | Planned |
 | 8. Awareness and personalization | Assess attention, crowdedness, and relevance | Planned |
-| 9. Operations | Schedule, secure, monitor, and deploy | Planned |
+| 9. Operations | Deploy, schedule, secure, and monitor | In progress |
 
 ## Delivery principles
 
@@ -125,13 +126,24 @@ management.
 
 ### 9. Operational hardening
 
+Current:
+
+- Render Blueprint for the static frontend, API, background worker, and
+  PostgreSQL
+- Automatic cross-service URL and internal database wiring
+- Alembic migrations before worker deployment and API database health checks
+
+Planned:
+
 - Scheduled runs and job recovery
 - Authentication for the private application
 - Provider budgets and rate controls
 - Cost, latency, and failure monitoring
 - Backups and restore testing
-- Container deployment to Azure
-- Managed PostgreSQL, secrets, logs, and alerts
+- Production-size Render compute and managed PostgreSQL with backups
+- Centralized logs and alerts
+
+See [Deploying to Render](deployment.md) for the current deployment boundary.
 
 ## Explicitly deferred
 
