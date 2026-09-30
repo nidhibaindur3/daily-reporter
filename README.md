@@ -9,6 +9,8 @@ and questions worth researching.
 The product is designed for long-term investment research. It does not tell you
 what to buy or sell, predict prices, or place trades.
 
+Try it out here: https://daily-reporter.nidhibaindur.com
+
 ## Why I built it
 
 I wanted a practical way to follow market-moving developments without turning
